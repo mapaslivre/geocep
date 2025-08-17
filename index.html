@@ -1,87 +1,256 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoCEP</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-        }
-        header {
-            display: flex;
-            align-items: center;
-            background: #2c3e50;
-            color: white;
-            padding: 10px;
-        }
-        header img {
-            height: 40px;
-            margin-right: 10px;
-        }
-        #map {
-            height: 90vh;
-            width: 100%;
-        }
-        #search {
-            padding: 10px;
-            background: #ecf0f1;
-        }
-        input, button {
-            padding: 8px;
-            margin: 5px;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GeoCEP</title>
+  <meta name="description" content="Site simples para buscar CEP a partir de um ponto no mapa, endereço ou CEP, usando dados do OpenStreetMap (Nominatim/Overpass)." />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #101828;
+      --muted: #94a3b8;
+      --text: #e2e8f0;
+      --brand: #22c55e;
+      --brand-600: #16a34a;
+      --danger: #ef4444;
+      --card: #0f172a;
+      --chip: #1e293b;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; padding: 0; }
+    body {
+      display: grid; grid-template-columns: 360px 1fr; grid-template-rows: 1fr;
+      color: var(--text); background: linear-gradient(180deg, #0b1220 0%, #0b1220 60%, #0a0f1a 100%);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    aside {
+      height: 100vh; overflow: auto; padding: 18px; border-right: 1px solid rgba(148,163,184,.15);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 100%);
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    }
+    .brand img {
+      width: 100px;
+      height: 75px;
+      object-fit: contain;
+    }
+    .panel { background: var(--panel); border: 1px solid rgba(148,163,184,.15); border-radius: 16px; padding: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.25) inset, 0 10px 30px rgba(0,0,0,.2); }
+    .section { margin: 12px 0 16px; }
+    label { display:block; font-size:12px; color: var(--muted); margin-bottom:6px; }
+    input, button, select, textarea {
+      width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(148,163,184,.18);
+      background: #0b1220; color: var(--text);
+      outline: none; transition: border .2s, transform .06s ease;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(34,197,94,.15); }
+    button { cursor: pointer; font-weight: 600; background: linear-gradient(180deg, var(--brand) 0%, var(--brand-600) 100%); border: none; }
+    button:hover { filter: brightness(0.95); }
+    button:active { transform: translateY(1px); }
+    .grid { display: grid; gap: 10px; }
+    .grid2 { grid-template-columns: 1fr 1fr; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .chip { font-size: 12px; padding: 6px 8px; background: var(--chip); border: 1px solid rgba(148,163,184,.15); border-radius: 999px; }
+    .result { background: var(--card); border: 1px solid rgba(148,163,184,.15); border-radius: 14px; padding: 10px; margin-top: 10px; }
+    .result h3 { margin: 0 0 6px; font-size: 14px; }
+    #map { height: 100vh; width: 100%; margin: 0; padding: 0; }
+    .footer { font-size: 11px; color: var(--muted); margin-top: 14px; line-height: 1.4; text-align: center; }
+    .footer img {
+      display: block;
+      margin: 10px auto 0;
+      width: 100px;
+      height: 100px;
+      object-fit: contain;
+    }
+    .row { display:flex; gap:8px; }
+    .row > * { flex: 1; }
+    .danger { background: linear-gradient(180deg, #ef4444, #b91c1c); }
+    .link { color: #93c5fd; text-decoration: none; }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background:#0f172a; border:1px solid rgba(148,163,184,.2); padding:2px 6px; border-radius:6px; font-size:12px; }
+  </style>
 </head>
 <body>
-    <header>
-        <img src="126a525c-c406-4607-b366-92c7f7ced257.png" alt="GeoCEP Logo">
-        <h1>GeoCEP</h1>
-    </header>
-    <div id="search">
-        <input type="text" id="cepInput" placeholder="Digite um CEP ou endereço...">
-        <button onclick="searchCEP()">Buscar</button>
+  <aside>
+    <div class="brand">
+      <img src="126a525c-c406-4607-b366-92c7f7ced257.png" alt="GeoCEP Logo">
     </div>
-    <div id="map"></div>
 
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script>
-        const map = L.map('map').setView([-15.77972, -47.92972], 4);
+    <div class="panel section">
+      <div class="grid">
+        <div>
+          <label for="cep">Buscar por CEP</label>
+          <div class="row">
+            <input id="cep" placeholder="Ex: 50791-460" maxlength="9" />
+            <button id="btnCep">Buscar</button>
+          </div>
+          <div class="hint">Dica: digite com ou sem hífen. País padrão: Brasil.</div>
+        </div>
+        <hr style="border: none; border-top: 1px solid rgba(148,163,184,.15); margin: 6px 0;">
+        <div>
+          <label>Buscar por endereço</label>
+          <input id="endereco" placeholder="Rua, bairro, cidade, estado" />
+          <div class="row">
+            <button id="btnEnd">Buscar endereço</button>
+            <button id="btnLimpar" class="danger">Limpar</button>
+          </div>
+          <div class="hint">Resultado mostra o CEP (se disponível) e centraliza o mapa.</div>
+        </div>
+      </div>
+    </div>
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contribuidores'
-        }).addTo(map);
+    <div class="panel section">
+      <label>Ferramentas</label>
+      <div class="grid grid2">
+        <button id="btnMeuLocal">Ir para minha localização</button>
+        <button id="btnCopiar">Copiar CEP</button>
+        <button id="btnMostrarArea">Exibir endereços com CEP na área</button>
+      </div>
+      <div class="chips">
+        <span class="chip">Clique no mapa → CEP</span>
+        <span class="chip">Shift + Arrastar → medir área</span>
+        <span class="chip">Mousewheel → zoom</span>
+      </div>
+      <div class="hint">As áreas de CEP nem sempre existem no OSM. A busca usa Nominatim; pontos com <code class="kbd">addr:postcode</code> são mostrados.
+      </div>
+    </div>
 
-        async function searchCEP() {
-            const query = document.getElementById('cepInput').value;
-            if (!query) return alert("Digite um CEP ou endereço.");
+    <div class="panel section">
+      <label>Resultados</label>
+      <div id="resultados"></div>
+    </div>
 
-            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${query}`;
-            const response = await fetch(url);
-            const data = await response.json();
+    <div class="footer">
+      Baseado em dados do <a class="link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>. Respeite os <a class="link" href="https://operations.osmfoundation.org/policies/nominatim/" target="_blank" rel="noopener">termos do Nominatim</a> e <a class="link" href="https://operations.osmfoundation.org/policies/api/" target="_blank" rel="noopener">Overpass API</a>. Este é um protótipo educativo.
+      <img src="logo-geocep.png" alt="GEO CEP">
+    </div>
+  </aside>
 
-            if (data.length > 0) {
-                const { lat, lon, display_name } = data[0];
-                map.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(map).bindPopup(display_name).openPopup();
-            } else {
-                alert("Não encontrado.");
-            }
-        }
+  <main id="map"></main>
 
-        map.on('click', async function (e) {
-            const { lat, lng } = e.latlng;
-            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-            const response = await fetch(url);
-            const data = await response.json();
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    // Inicializar mapa
+    const map = L.map('map').setView([-14.235, -51.9253], 4);
 
-            if (data && data.address) {
-                const cep = data.address.postcode || "CEP não encontrado";
-                L.marker([lat, lng]).addTo(map).bindPopup(`CEP: ${cep}`).openPopup();
-            }
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contribuidores'
+    }).addTo(map);
+
+    const resultadosDiv = document.getElementById('resultados');
+    let markersLayer = L.layerGroup().addTo(map);
+
+    // Ícone verde para pontos com CEP
+    const greenIcon = new L.Icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41]
+    });
+
+    // Função para buscar CEP
+    async function buscarCep() {
+      const cep = document.getElementById('cep').value;
+      if (!cep) return alert("Digite um CEP.");
+      const url = `https://nominatim.openstreetmap.org/search?format=json&countrycodes=br&postalcode=${cep}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      resultadosDiv.innerHTML = "";
+      markersLayer.clearLayers();
+      if (data.length > 0) {
+        const { lat, lon, display_name } = data[0];
+        map.setView([lat, lon], 16);
+        L.marker([lat, lon]).addTo(markersLayer).bindPopup(display_name).openPopup();
+        resultadosDiv.innerHTML = `<div class='result'><h3>Resultado:</h3><p>${display_name}</p></div>`;
+      } else {
+        resultadosDiv.innerHTML = `<div class='result'><p>CEP não encontrado.</p></div>`;
+      }
+    }
+
+    // Função para buscar endereço
+    async function buscarEndereco() {
+      const end = document.getElementById('endereco').value;
+      if (!end) return alert("Digite um endereço.");
+      const url = `https://nominatim.openstreetmap.org/search?format=json&countrycodes=br&q=${encodeURIComponent(end)}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      resultadosDiv.innerHTML = "";
+      markersLayer.clearLayers();
+      if (data.length > 0) {
+        const { lat, lon, display_name } = data[0];
+        map.setView([lat, lon], 16);
+        L.marker([lat, lon]).addTo(markersLayer).bindPopup(display_name).openPopup();
+        resultadosDiv.innerHTML = `<div class='result'><h3>Resultado:</h3><p>${display_name}</p></div>`;
+      } else {
+        resultadosDiv.innerHTML = `<div class='result'><p>Endereço não encontrado.</p></div>`;
+      }
+    }
+
+    // Função para buscar CEP a partir de clique no mapa
+    async function buscarCepPorCoordenada(lat, lon) {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      const cep = data.address.postcode || "CEP não encontrado";
+      const endereco = data.display_name || "Endereço não disponível";
+      markersLayer.clearLayers();
+      L.marker([lat, lon]).addTo(markersLayer).bindPopup(`Endereço: ${endereco}<br>CEP: ${cep}`).openPopup();
+      resultadosDiv.innerHTML = `<div class='result'><h3>Resultado do clique:</h3><p>${endereco}<br>CEP: ${cep}</p></div>`;
+    }
+
+    // Função para buscar endereços com CEP dentro da área visível
+    async function buscarEnderecosNaArea() {
+      const bounds = map.getBounds();
+      const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];node["addr:postcode"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});out;`;
+      const resp = await fetch(overpassUrl);
+      const data = await resp.json();
+      resultadosDiv.innerHTML = "<div class='result'><h3>Endereços com CEP na área:</h3></div>";
+      markersLayer.clearLayers();
+      if (data.elements.length > 0) {
+        data.elements.slice(0,200).forEach(el => {
+          if (el.lat && el.lon) {
+            const cep = el.tags["addr:postcode"] || "CEP";
+            const rua = el.tags["addr:street"] || "Rua desconhecida";
+            const cidade = el.tags["addr:city"] || "Cidade";
+            const texto = `${rua}, ${cidade} - CEP: ${cep}`;
+            L.marker([el.lat, el.lon], {icon: greenIcon}).addTo(markersLayer).bindPopup(texto);
+            resultadosDiv.innerHTML += `<div class='result'><p>${texto}</p></div>`;
+          }
         });
-    </script>
+        if (data.elements.length > 200) {
+          resultadosDiv.innerHTML += `<div class='result'><p>Exibindo apenas os 200 primeiros resultados de ${data.elements.length} encontrados.</p></div>`;
+        }
+      } else {
+        resultadosDiv.innerHTML += `<div class='result'><p>Nenhum endereço com CEP encontrado nesta área.</p></div>`;
+      }
+    }
+
+    // Eventos dos botões
+    document.getElementById('btnCep').addEventListener('click', buscarCep);
+    document.getElementById('btnEnd').addEventListener('click', buscarEndereco);
+    document.getElementById('btnLimpar').addEventListener('click', () => {
+      resultadosDiv.innerHTML = "";
+      document.getElementById('cep').value = "";
+      document.getElementById('endereco').value = "";
+      markersLayer.clearLayers();
+    });
+    document.getElementById('btnMostrarArea').addEventListener('click', buscarEnderecosNaArea);
+
+    // Evento de clique no mapa
+    map.on('click', function(e) {
+      const { lat, lng } = e.latlng;
+      buscarCepPorCoordenada(lat, lng);
+    });
+  </script>
 </body>
 </html>
