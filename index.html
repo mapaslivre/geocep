@@ -112,6 +112,7 @@
         <button id="btnMeuLocal">Ir para minha localização</button>
         <button id="btnCopiar">Copiar CEP</button>
         <button id="btnMostrarArea">Exibir endereços com CEP na área</button>
+        <button id="btnExportarCSV">Baixar CSV</button>
       </div>
       <div class="chips">
         <span class="chip">Clique no mapa → CEP</span>
@@ -135,7 +136,60 @@
 
   <main id="map"></main>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="">
+    let ultimaConsulta = [];
+
+    async function buscarEnderecosNaArea() {
+      const bounds = map.getBounds();
+      const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];node["addr:postcode"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});out;`;
+      const resp = await fetch(overpassUrl);
+      const data = await resp.json();
+      resultadosDiv.innerHTML = "<div class='result'><h3>Endereços com CEP na área:</h3></div>";
+      markersLayer.clearLayers();
+      ultimaConsulta = data.elements;
+      if (data.elements.length > 0) {
+        data.elements.slice(0,200).forEach(el => {
+          if (el.lat && el.lon) {
+            const cep = el.tags["addr:postcode"] || "CEP";
+            const rua = el.tags["addr:street"] || "Rua desconhecida";
+            const cidade = el.tags["addr:city"] || "Cidade";
+            const texto = `${rua}, ${cidade} - CEP: ${cep}`;
+            L.marker([el.lat, el.lon], {icon: greenIcon}).addTo(markersLayer).bindPopup(texto);
+            resultadosDiv.innerHTML += `<div class='result'><p>${texto}</p></div>`;
+          }
+        });
+        if (data.elements.length > 200) {
+          resultadosDiv.innerHTML += `<div class='result'><p>Exibindo apenas os 200 primeiros resultados de ${data.elements.length} encontrados.</p></div>`;
+        }
+      } else {
+        resultadosDiv.innerHTML += `<div class='result'><p>Nenhum endereço com CEP encontrado nesta área.</p></div>`;
+      }
+    }
+
+    function exportarCSV() {
+      if (!ultimaConsulta || ultimaConsulta.length === 0) {
+        alert("Nenhum dado para exportar. Execute uma busca primeiro.");
+        return;
+      }
+      let csv = "Rua,Cidade,CEP,Latitude,Longitude\n";
+      ultimaConsulta.forEach(el => {
+        if (el.lat && el.lon) {
+          const cep = el.tags["addr:postcode"] || "";
+          const rua = el.tags["addr:street"] || "";
+          const cidade = el.tags["addr:city"] || "";
+          csv += `"\${rua}","\${cidade}","\${cep}",\${el.lat},\${el.lon}\n`;
+        }
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "enderecos_cep.csv";
+      link.click();
+    }
+
+    document.getElementById('btnExportarCSV').addEventListener('click', exportarCSV);
+    
+</script>
   <script>
     // Inicializar mapa
     const map = L.map('map').setView([-14.235, -51.9253], 4);
@@ -251,6 +305,59 @@
       const { lat, lng } = e.latlng;
       buscarCepPorCoordenada(lat, lng);
     });
-  </script>
+  
+    let ultimaConsulta = [];
+
+    async function buscarEnderecosNaArea() {
+      const bounds = map.getBounds();
+      const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];node["addr:postcode"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});out;`;
+      const resp = await fetch(overpassUrl);
+      const data = await resp.json();
+      resultadosDiv.innerHTML = "<div class='result'><h3>Endereços com CEP na área:</h3></div>";
+      markersLayer.clearLayers();
+      ultimaConsulta = data.elements;
+      if (data.elements.length > 0) {
+        data.elements.slice(0,200).forEach(el => {
+          if (el.lat && el.lon) {
+            const cep = el.tags["addr:postcode"] || "CEP";
+            const rua = el.tags["addr:street"] || "Rua desconhecida";
+            const cidade = el.tags["addr:city"] || "Cidade";
+            const texto = `${rua}, ${cidade} - CEP: ${cep}`;
+            L.marker([el.lat, el.lon], {icon: greenIcon}).addTo(markersLayer).bindPopup(texto);
+            resultadosDiv.innerHTML += `<div class='result'><p>${texto}</p></div>`;
+          }
+        });
+        if (data.elements.length > 200) {
+          resultadosDiv.innerHTML += `<div class='result'><p>Exibindo apenas os 200 primeiros resultados de ${data.elements.length} encontrados.</p></div>`;
+        }
+      } else {
+        resultadosDiv.innerHTML += `<div class='result'><p>Nenhum endereço com CEP encontrado nesta área.</p></div>`;
+      }
+    }
+
+    function exportarCSV() {
+      if (!ultimaConsulta || ultimaConsulta.length === 0) {
+        alert("Nenhum dado para exportar. Execute uma busca primeiro.");
+        return;
+      }
+      let csv = "Rua,Cidade,CEP,Latitude,Longitude\n";
+      ultimaConsulta.forEach(el => {
+        if (el.lat && el.lon) {
+          const cep = el.tags["addr:postcode"] || "";
+          const rua = el.tags["addr:street"] || "";
+          const cidade = el.tags["addr:city"] || "";
+          csv += `"\${rua}","\${cidade}","\${cep}",\${el.lat},\${el.lon}\n`;
+        }
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "enderecos_cep.csv";
+      link.click();
+    }
+
+    document.getElementById('btnExportarCSV').addEventListener('click', exportarCSV);
+    
+</script>
 </body>
 </html>
